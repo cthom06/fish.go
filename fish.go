@@ -2,15 +2,15 @@ package fish
 
 import (
 	"io"
-	"io/ioutil"
 	"rand"
 	"fmt"
+	"os"
 )
 
-type Error interface{}
+type Error os.Error
 
-var error = Error("something smells fishy...")
-var NoError = Error(0)
+var error = os.NewError("something smells fishy...")
+var NoError = os.NewError("")
 
 type codebox [][]int
 
@@ -53,10 +53,13 @@ type runtime struct {
 	}
 }
 
-func NewRuntime(data io.Reader) (*runtime) {
+func NewRuntime(code []byte, stacks ...[]int) (*runtime) {
 	t1, t2, t3, t4 := make(codebox,0),make(codebox,0),make(codebox,0),make(codebox,0)
+	if len(stacks) == 0 {
+		stacks = [][]int{[]int{}}
+	}
 	tmp := &runtime{
-		[][]int{[]int{}},
+		stacks,
 		[4]*codebox{&t1,&t2,&t3,&t4},
 		RIGHT,
 		[2]int{0,0},
@@ -65,10 +68,9 @@ func NewRuntime(data io.Reader) (*runtime) {
 			Val int
 		}{false, 0},
 	}
-	d,_ := ioutil.ReadAll(data)
 	x := 0
 	y := 0
-	for _, v := range d {
+	for _, v := range code {
 		if v == '\n' {
 			y++
 			x = 0
@@ -241,8 +243,6 @@ func (r *runtime) Do(w byte, in io.Reader, out io.Writer) Error {
 			r.Dir = RIGHT
 		case RIGHT:
 			r.Dir = LEFT
-		default:
-			return error
 		}
 	case '_':
 		switch r.Dir {
@@ -250,8 +250,6 @@ func (r *runtime) Do(w byte, in io.Reader, out io.Writer) Error {
 			r.Dir = DOWN
 		case DOWN:
 			r.Dir = UP
-		default:
-			return error
 		}
 	case '#':
 		switch r.Dir {
