@@ -88,10 +88,16 @@ func (r *runtime) Move() {
 		if r.Pos[0] == 0 {
 			r.Pos[0] = len(*r.Boxes[0]) - 1
 		} else r.Pos[0]--
+		if r.Pos[1] >= len((*r.Boxes[0])[r.Pos[0]]) {
+			r.Move()
+		}
 	case DOWN:
 		if r.Pos[0] == len(*r.Boxes[0]) - 1 {
 			r.Pos[0] = 0
 		} else r.Pos[0]++
+		if r.Pos[1] >= len((*r.Boxes[0])[r.Pos[0]]) {
+			r.Move()
+		}
 	case LEFT:
 		if r.Pos[1] == 0 {
 			r.Pos[1] = len((*r.Boxes[0])[r.Pos[0]]) - 1
