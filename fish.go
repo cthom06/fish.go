@@ -4,13 +4,13 @@ import (
 	"io"
 	"io/ioutil"
 	"rand"
-	"os"
 	"fmt"
 )
 
 type Error interface{}
 
 var error = Error("something smells fishy...")
+var NoError = Error(0)
 
 type codebox [][]int
 
@@ -446,26 +446,27 @@ func (r *runtime) Do(w byte, in io.Reader, out io.Writer) Error {
 			return error
 		}
 	case ';':
-		os.Exit(0)
+		return NoError
 	default:
 		return error
 	}
 	return nil
 }
 
-func (r *runtime) Run(in io.Reader, out io.Writer, debug bool) {
-	e := Error(nil)
-	for e == nil {
+func (r *runtime) Run(in io.Reader, out io.Writer, debug io.Writer) Error {
+	for {
 		m := r.Read()
 		if m > 255 {
-			e = error
+			return error
 		} else {
-			if debug {
-				fmt.Fprintf(os.Stderr, "DEBUG: %c\n", byte(m))
+			if debug != nil {
+				fmt.Fprintf(debug, "DEBUG: %c\n", byte(m))
 			}
-			e = r.Do(byte(m), in, out)
+			if e := r.Do(byte(m), in, out); e != nil {
+				return e
+			}
 		}
 		r.Move()
 	}
-	fmt.Fprint(os.Stderr, e, "\n")
+	return nil
 }
