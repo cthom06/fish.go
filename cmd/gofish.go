@@ -20,7 +20,8 @@ func main() {
 			r := fish.NewRuntime(d)
 			b := bufio.NewWriter(os.Stdout)
 			if e := r.Run(os.Stdin, b); e != fish.NoError {
-				os.Stdout.WriteString(e.String() + "\n")
+				b.Flush()
+				os.Stderr.WriteString(e.String() + "\n")
 				os.Exit(3)
 			}
 			b.Flush()
