@@ -137,6 +137,10 @@ func (r *runtime) Pop() (int, Error) {
 	return 0, error
 }
 
+func (r *runtime) Len() int {
+	return len(r.Stacks[len(r.Stacks) - 1])
+}
+
 func (r *runtime) Split(size int) Error {
 	tmp := make([]int, size)
 	for size--; size >= 0; size-- {
@@ -341,10 +345,15 @@ func (r *runtime) Do(w byte, in io.Reader, out io.Writer) Error {
 	case '!':
 		r.Move()
 	case '?':
-		t,_ := r.Pop()
+		t,e := r.Pop()
+		if e != nil {
+			return error
+		}
 		if t == 0 {
 			r.Move()
 		}
+	case 'l':
+		r.Push(r.Len())
 	case ':':
 		if t, e := r.Pop(); e == nil {
 			r.Push(t)
