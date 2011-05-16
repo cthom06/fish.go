@@ -464,7 +464,7 @@ func (r *runtime) Run(in io.Reader, out io.Writer, debug io.Writer) Error {
 			return error
 		} else {
 			if debug != nil {
-				fmt.Fprintf(debug, "DEBUG: %c\n", byte(m))
+				fmt.Fprintf(debug, "%c\n", byte(m))
 			}
 			if e := r.Do(byte(m), in, out); e != nil {
 				return e
