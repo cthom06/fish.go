@@ -1,3 +1,5 @@
 GoFish - An interpreter for ><> in Go
 
 Should follow the specs @ http://esolangs.org/wiki/Fish
+
+Currently it's pretty slow

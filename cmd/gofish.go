@@ -4,6 +4,7 @@ import (
 	"os"
 	"io/ioutil"
 	"github.com/cthom06/GoFish/fish"
+	"bufio"
 )
 
 func main() {
@@ -17,10 +18,12 @@ func main() {
 			os.Exit(2)
 		} else {
 			r := fish.NewRuntime(d)
-			if e := r.Run(os.Stdin, os.Stdout, nil); e != fish.NoError {
+			b := bufio.NewWriter(os.Stdout)
+			if e := r.Run(os.Stdin, b); e != fish.NoError {
 				os.Stdout.WriteString(e.String() + "\n")
 				os.Exit(3)
 			}
+			b.Flush()
 		}
 	} else {
 		os.Stderr.WriteString(e.String() + "\n")

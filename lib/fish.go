@@ -12,7 +12,11 @@ type Error os.Error
 var error = os.NewError("something smells fishy...")
 var NoError = os.NewError("")
 
-type codebox [][]int
+type codebox struct {
+	D map[uint64]int
+	MaxY int
+	MaxX map[int]int
+}
 
 const (
 	UP = iota
@@ -21,30 +25,34 @@ const (
 	RIGHT
 )
 
+func pair(x, y int) uint64 {
+	return uint64(x) | (uint64(y) << 32)
+}
+
+func newcodebox() *codebox {
+	return &codebox{ make(map[uint64]int), 0, make(map[int]int) }
+}
+
 func (c *codebox) Set(x, y, v int) {
-	if c == nil {
-		t := make(codebox, 0, y + 2)
-		c = &t
+	c.D[pair(x, y)] = v
+	if y > c.MaxY { c.MaxY = y }
+	if t, ok := c.MaxX[y]; ok {
+		if x > t { c.MaxX[y] = x }
+	} else if x > 0 {
+		c.MaxX[y] = x
 	}
-	for len(*c) <= y {
-		*c = append(*c, make([]int, 0, 20))
-	}
-	for len((*c)[y]) <= x {
-		(*c)[y] = append((*c)[y], 0)
-	}
-	(*c)[y][x] = v
 }
 
 func (c *codebox) Get(x, y int) (int, Error) {
-	if c != nil && len(*c) > y && len((*c)[y]) > x {
-		return (*c)[y][x], nil
+	if v, ok := c.D[pair(x, y)]; ok {
+		return v, nil
 	}
-	return 0, error
+	return int(' '), error
 }
 
 type runtime struct {
 	Stacks [][]int
-	Boxes [4]*codebox
+	Box *codebox
 	Dir byte
 	Pos [2]int
 	Register struct {
@@ -54,13 +62,12 @@ type runtime struct {
 }
 
 func NewRuntime(code []byte, stacks ...[]int) (*runtime) {
-	t1, t2, t3, t4 := make(codebox,0),make(codebox,0),make(codebox,0),make(codebox,0)
 	if len(stacks) == 0 {
 		stacks = [][]int{[]int{}}
 	}
 	tmp := &runtime{
 		stacks,
-		[4]*codebox{&t1,&t2,&t3,&t4},
+		newcodebox(),
 		RIGHT,
 		[2]int{0,0},
 		struct{
@@ -75,7 +82,7 @@ func NewRuntime(code []byte, stacks ...[]int) (*runtime) {
 			y++
 			x = 0
 		} else {
-			tmp.Boxes[0].Set(x, y, int(v))
+			tmp.Box.Set(x, y, int(v))
 			x++
 		}
 	}
@@ -86,57 +93,34 @@ func (r *runtime) Move() {
 	switch r.Dir {
 	case UP:
 		if r.Pos[0] == 0 {
-			r.Pos[0] = len(*r.Boxes[0]) - 1
+			r.Pos[0] = r.Box.MaxY
 		} else r.Pos[0]--
-		if r.Pos[1] >= len((*r.Boxes[0])[r.Pos[0]]) {
-			r.Move()
-		}
 	case DOWN:
-		if r.Pos[0] == len(*r.Boxes[0]) - 1 {
+		if r.Pos[0] == r.Box.MaxY {
 			r.Pos[0] = 0
 		} else r.Pos[0]++
-		if r.Pos[1] >= len((*r.Boxes[0])[r.Pos[0]]) {
-			r.Move()
-		}
 	case LEFT:
 		if r.Pos[1] == 0 {
-			r.Pos[1] = len((*r.Boxes[0])[r.Pos[0]]) - 1
+			r.Pos[1],_ = r.Box.MaxX[r.Pos[0]]
 		} else r.Pos[1]--
 	case RIGHT:
-		if r.Pos[1] == len((*r.Boxes[0])[r.Pos[0]]) - 1 {
+		mx,_ := r.Box.MaxX[r.Pos[0]]
+		if r.Pos[1] == mx {
 			r.Pos[1] = 0
 		} else r.Pos[1]++
 	}
 }
 
 func (r *runtime) Get(x, y int) (int, Error) {
-	index := 0
-	if x < 0 {
-		index += 1
-		x *= -1
-	}
-	if y < 0 {
-		index += 2
-		y *= -1
-	}
-	return r.Boxes[index].Get(x, y)
+	return r.Box.Get(x, y)
 }
 
 func (r *runtime) Set(x, y, v int) {
-	index := 0
-	if x < 0 {
-		index += 1
-		x *= -1
-	}
-	if y < 0 {
-		index += 2
-		y *= -1
-	}
-	r.Boxes[index].Set(x, y, v)
+	r.Box.Set(x, y, v)
 }
 
 func (r *runtime) Read() int {
-	t,_ := r.Get(r.Pos[1],r.Pos[0])
+	t,_ := r.Box.Get(r.Pos[1],r.Pos[0])
 	return t
 }
 
@@ -408,7 +392,7 @@ func (r *runtime) Do(w byte, in io.Reader, out io.Writer) Error {
 		if e1 != nil || e2 != nil {
 			return error
 		}
-		if v, e := r.Get(x, y); e == nil {
+		if v, e := r.Box.Get(x, y); e == nil {
 			r.Push(v)
 		} else return error
 	case 'p':
@@ -418,7 +402,7 @@ func (r *runtime) Do(w byte, in io.Reader, out io.Writer) Error {
 		if e1 != nil || e2 != nil || e3 != nil {
 			return error
 		}
-		r.Set(x, y, v)
+		r.Box.Set(x, y, v)
 	case 'o':
 		if v, e := r.Pop(); e == nil {
 			if _, e = fmt.Fprintf(out, "%c", byte(v)); e != nil {
@@ -457,15 +441,28 @@ func (r *runtime) Do(w byte, in io.Reader, out io.Writer) Error {
 	return nil
 }
 
-func (r *runtime) Run(in io.Reader, out io.Writer, debug io.Writer) Error {
+func (r *runtime) Run(in io.Reader, out io.Writer) Error {
 	for {
 		m := r.Read()
 		if m > 255 {
 			return error
 		} else {
-			if debug != nil {
-				fmt.Fprintf(debug, "%c\n", byte(m))
+			if e := r.Do(byte(m), in, out); e != nil {
+				return e
 			}
+		}
+		r.Move()
+	}
+	return nil
+}
+
+func (r *runtime) Debug(in io.Reader, out, debug io.Writer) Error {
+	for {
+		m := r.Read()
+		if m > 255 {
+			return error
+		} else {
+			fmt.Fprintf(debug, "%c\n", byte(m))
 			if e := r.Do(byte(m), in, out); e != nil {
 				return e
 			}
