@@ -7,6 +7,13 @@ import (
 	"os"
 )
 
+const (
+	UP = iota
+	DOWN
+	LEFT
+	RIGHT
+)
+
 type Error os.Error
 
 var error = os.NewError("something smells fishy...")
@@ -17,13 +24,6 @@ type codebox struct {
 	MaxY int
 	MaxX map[int]int
 }
-
-const (
-	UP = iota
-	DOWN
-	LEFT
-	RIGHT
-)
 
 func pair(x, y int) uint64 {
 	return uint64(x) | (uint64(y) << 32)
@@ -50,15 +50,17 @@ func (c *codebox) Get(x, y int) (int, Error) {
 	return int(' '), error
 }
 
+type register struct {
+	Pop bool
+	Val int
+}
+
 type runtime struct {
 	Stacks [][]int
 	Box *codebox
 	Dir byte
 	Pos [2]int
-	Register struct {
-		Pop bool
-		Val int
-	}
+	Register []register
 }
 
 func NewRuntime(code []byte, stacks ...[]int) (*runtime) {
@@ -70,10 +72,7 @@ func NewRuntime(code []byte, stacks ...[]int) (*runtime) {
 		newcodebox(),
 		RIGHT,
 		[2]int{0,0},
-		struct{
-			Pop bool
-			Val int
-		}{false, 0},
+		[]register{register{false,0}},
 	}
 	x := 0
 	y := 0
@@ -150,6 +149,7 @@ func (r *runtime) Split(size int) Error {
 		}
 	}
 	r.Stacks = append(r.Stacks, tmp)
+	r.Register = append(r.Register, register{false,0})
 	return nil
 }
 
@@ -162,6 +162,7 @@ func (r *runtime) Merge() Error {
 	for _, v := range tmp {
 		r.Push(v)
 	}
+	r.Register = r.Register[:len(r.Register) - 1]
 	return nil
 }
 
@@ -382,12 +383,12 @@ func (r *runtime) Do(w byte, in io.Reader, out io.Writer) Error {
 		r.Push(v3)
 		r.Push(v2)
 	case '&':
-		if r.Register.Pop {
-			r.Register.Pop = false
-			r.Push(r.Register.Val)
+		if r.Register[len(r.Register) - 1].Pop {
+			r.Register[len(r.Register) - 1].Pop = false
+			r.Push(r.Register[len(r.Register) - 1].Val)
 		} else if v, e := r.Pop(); e == nil {
-			r.Register.Pop = true
-			r.Register.Val = v
+			r.Register[len(r.Register) - 1].Pop = true
+			r.Register[len(r.Register) - 1].Val = v
 		} else return error
 	case 'r':
 		r.Reverse()
