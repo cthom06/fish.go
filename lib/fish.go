@@ -429,7 +429,8 @@ func (r *runtime) Do(w byte, in io.Reader, out io.Writer) Error {
 		b := []byte{0}
 		for n, e := in.Read(b); n < 1; n, e = in.Read(b) {
 			if e != nil {
-				return error
+				r.Push(-1)
+				return nil
 			}
 		}
 		r.Push(int(b[0]))
