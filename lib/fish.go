@@ -274,21 +274,35 @@ func (r *runtime) Do(w byte, in io.Reader, out io.Writer) Error {
 		if e1 != nil || e1 != e2 {
 			return error
 		}
-		r.Push(v1 + v2)
+		result := v1 + v2
+		if v1 >> 31 == v2 >> 31 && v1 >> 31 != result >> 31 {
+			return error
+		}
+		r.Push(result)
 	case '-':
 		v1, e1 := r.Pop()
 		v2, e2 := r.Pop()
 		if e1 != nil || e1 != e2 {
 			return error
 		}
-		r.Push(v2 - v1)
+		result := v2 - v1
+		if v2 >> 31 != v1 >> 31 && v2 >> 31 != result >> 31 {
+			return error
+		}
+		r.Push(result)
 	case '*':
 		v1, e1 := r.Pop()
 		v2, e2 := r.Pop()
 		if e1 != nil || e1 != e2 {
 			return error
 		}
-		r.Push(v1 * v2)
+		//TODO: This breaks if we start using 64 bit values
+		//and it makes the interpreter even slower on 32-bit machines
+		temp_res := int64(v1) * int64(v2)
+		if temp_res >> 32 != 0 || (v1 >> 31 == v2 >> 31 && temp_res >> 31 > 0) || (v1 >> 31 != v2 >> 31 && temp_res >> 31 == 0) {
+			return error
+		}
+		r.Push(int(temp_res))
 	case ',':
 		v1, e1 := r.Pop()
 		v2, e2 := r.Pop()
